@@ -1,0 +1,280 @@
+<!doctype html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Orderbook Simulator</title>
+    <style>
+        body {
+            font-family: Arial, Helvetica, sans-serif;
+            margin: 20px
+        }
+
+        .container {
+            display: flex;
+            gap: 20px
+        }
+
+        .book {
+            width: 45%
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse
+        }
+
+        th,
+        td {
+            padding: 6px;
+            text-align: right;
+            position: relative; /* buat bar overlay */
+            overflow: hidden; /* agar bar tidak melebar */
+        }
+
+        th {
+            background: #f0f0f0
+        }
+
+        tr.ask {
+            color: #b00020
+        }
+
+        tr.bid {
+            color: #007b00
+        }
+
+        /* Bar warna untuk depth chart di belakang qty */
+        td.qty-bar {
+            position: relative;
+        }
+
+        td.qty-bar .bar {
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            z-index: -1;
+            opacity: 0.25;
+            border-radius: 4px;
+        }
+
+        tr.ask td.qty-bar .bar {
+            background-color: #b00020; /* merah */
+        }
+
+        tr.bid td.qty-bar .bar {
+            background-color: #007b00; /* hijau */
+        }
+
+        .info {
+            margin-bottom: 10px
+        }
+
+        .controls {
+            margin-top: 10px
+        }
+
+        button {
+            padding: 10px 16px;
+            margin-right: 8px
+        }
+
+        .log {
+            max-height: 300px;
+            overflow: auto;
+            background: #fafafa;
+            padding: 8px;
+            border: 1px solid #eee
+        }
+    </style>
+</head>
+
+<body>
+    <h2 id="title">Tokocrypto Orderbook Simulator</h2>
+    <div class="info">
+        <span id="mid">Mid: -</span> &nbsp; | &nbsp;
+        <span id="balances">Balances: -</span>
+    </div>
+    <div class="container">
+        <div class="book">
+            <h3 id="asks-title">Asks (sell)</h3>
+            <table id="asks">
+                <thead>
+                    <tr>
+                        <th id="asks-price-header">Price</th>
+                        <th id="asks-qty-header">Qty</th>
+                        <th id="asks-total-header">Total</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+        <div class="book">
+            <h3 id="bids-title">Bids (buy)</h3>
+            <table id="bids">
+                <thead>
+                    <tr>
+                        <th id="bids-price-header">Price</th>
+                        <th id="bids-qty-header">Qty</th>
+                        <th id="bids-total-header">Total</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="controls">
+        <button id="btnBuy">Simulate MARKET BUY (random qty)</button>
+        <button id="btnSell">Simulate MARKET SELL (random qty)</button>
+    </div>
+
+    <h3>Unrealized PnL</h3>
+    <div class="log" id="pnl"></div>
+    <h3>Transaction Log</h3>
+    <div class="log" id="log"></div>
+
+    <script>
+        const ws = new WebSocket('ws://localhost:3000');
+        let state = null;
+        let baseCoin = 'BABY';   // default fallback
+        let quoteCoin = 'IDR';    // default fallback
+
+        ws.addEventListener('open', () => console.log('connected to server ws'));
+        ws.addEventListener('message', (ev) => {
+            try {
+                const msg = JSON.parse(ev.data);
+                if (msg.type === 'state') {
+                    state = msg;
+                    if (msg.baseCoin) baseCoin = msg.baseCoin.toUpperCase();
+                    if (msg.quoteCoin) quoteCoin = msg.quoteCoin.toUpperCase();
+
+                    updateLabels();
+                    renderState(msg);
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        });
+
+        function updateLabels() {
+            document.getElementById('title').innerText = `Tokocrypto Orderbook Simulator — ${baseCoin}/${quoteCoin}`;
+            document.getElementById('asks-price-header').innerText = `Price (${quoteCoin})`;
+            document.getElementById('asks-qty-header').innerText = `Qty (${baseCoin})`;
+            document.getElementById('asks-total-header').innerText = `Total (${quoteCoin})`;
+
+            document.getElementById('bids-price-header').innerText = `Price (${quoteCoin})`;
+            document.getElementById('bids-qty-header').innerText = `Qty (${baseCoin})`;
+            document.getElementById('bids-total-header').innerText = `Total (${quoteCoin})`;
+        }
+
+        function renderState(msg) {
+            const { balances, orderbook, midPrice, txLog, totalUnrealizedPnL } = msg;
+
+            document.getElementById('mid').innerText = 'Mid: ' + (midPrice ? Math.round(midPrice).toLocaleString() + ' ' + quoteCoin : '-');
+            document.getElementById('pnl').innerText = `PnL: ${totalUnrealizedPnL ? totalUnrealizedPnL.toFixed(2) + ' ' + quoteCoin : '-'}`;
+
+            const asksTbody = document.querySelector('#asks tbody');
+            const bidsTbody = document.querySelector('#bids tbody');
+            asksTbody.innerHTML = '';
+            bidsTbody.innerHTML = '';
+
+            // Cari max qty di asks dan bids (untuk skala bar)
+            const maxAskQty = orderbook.asks.length ? Math.max(...orderbook.asks.map(a => a.qty)) : 1;
+            const maxBidQty = orderbook.bids.length ? Math.max(...orderbook.bids.map(b => b.qty)) : 1;
+
+            orderbook.asks.slice(0, 20).forEach(a => {
+                const tr = document.createElement('tr');
+                tr.className = 'ask';
+                const total = a.price * a.qty;
+                const barWidthPercent = (a.qty / maxAskQty) * 100;
+
+                tr.innerHTML = `
+                    <td>${Math.round(a.price).toLocaleString()} ${quoteCoin}</td>
+                    <td class="qty-bar">${a.qty.toFixed(6)} ${baseCoin}
+                        <div class="bar" style="width: ${barWidthPercent}%;"></div>
+                    </td>
+                    <td>${Math.round(total).toLocaleString()} ${quoteCoin}</td>`;
+
+                asksTbody.appendChild(tr);
+            });
+
+            orderbook.bids.slice(0, 20).forEach(b => {
+                const tr = document.createElement('tr');
+                tr.className = 'bid';
+                const total = b.price * b.qty;
+                const barWidthPercent = (b.qty / maxBidQty) * 100;
+
+                tr.innerHTML = `
+                    <td>${Math.round(b.price).toLocaleString()} ${quoteCoin}</td>
+                    <td class="qty-bar">${b.qty.toFixed(6)} ${baseCoin}
+                        <div class="bar" style="width: ${barWidthPercent}%;"></div>
+                    </td>
+                    <td>${Math.round(total).toLocaleString()} ${quoteCoin}</td>`;
+
+                bidsTbody.appendChild(tr);
+            });
+
+            const logEl = document.getElementById('log');
+            logEl.innerHTML = '';
+            txLog.slice(0, 50).forEach(t => {
+                const d = new Date(t.ts);
+                const line = document.createElement('div');
+                line.innerText = `${d.toLocaleTimeString()} | ${t.side.toUpperCase()} ${t.qty.toFixed(6)} ${baseCoin} @ ${Math.round(t.price).toLocaleString()} ${quoteCoin} | PnL: ${t.unrealizedPnLTrade ? t.unrealizedPnLTrade.toFixed(2) + ' ' + quoteCoin : '-'}`;
+                logEl.appendChild(line);
+            });
+        }
+
+        // Buttons
+        document.getElementById('btnBuy').addEventListener('click', () => {
+            const idrBalance = state?.balances[quoteCoin.toLowerCase()] || 0;
+            if (idrBalance < 0.001) {
+                console.log('Balance IDR terlalu kecil, tidak bisa beli');
+                return;
+            }
+            const topAskQty = state?.orderbook?.asks[0]?.qty || 0.05;
+            const topAskPrice = state?.orderbook?.asks[0]?.price || 0.05;
+
+            const maxQty = idrBalance * 0.01 / topAskPrice;
+
+            const randomQty = Math.random() * maxQty;
+            const qty = parseFloat(Math.min(randomQty, maxQty).toFixed(6));
+            if (qty < 0.001) {
+                console.log('Buy qty too kecil, skipping order');
+                return;
+            }
+
+            fetch('http://localhost:3000/api/market', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ side: 'buy', qty })
+            }).then(r => r.json()).then(r => console.log(r));
+        });
+
+        document.getElementById('btnSell').addEventListener('click', () => {
+            const baseBalance = state?.balances[baseCoin] || 0;
+            if (baseBalance < 0.001) {
+                console.log('Balance base coin terlalu kecil, tidak bisa jual');
+                return;
+            }
+            const maxQty = baseBalance * 0.0001;
+            const randomQty = Math.random() * maxQty;
+            const qty = parseFloat(Math.min(randomQty, maxQty).toFixed(6));
+            if (qty < 0.001) {
+                console.log('Sell qty terlalu kecil, skipping order');
+                return;
+            }
+
+            fetch('http://localhost:3000/api/market', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ side: 'sell', qty })
+            }).then(r => r.json()).then(r => console.log(r));
+        });
+
+    </script>
+</body>
+
+</html>
