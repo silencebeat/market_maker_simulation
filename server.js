@@ -37,6 +37,8 @@ let midPrice = 0; // TRUMP/IDR mid price
 let externalPrice = null;
 let usdt_idr = null;
 let totalUnrealizedPnL = 0;
+let totalBase = 0;
+let avgPrice = 0; // average price of trades
 
 let orderbook = {
     bids: [], // [{price, qty, id, owner: 'mm'}]
@@ -121,7 +123,7 @@ function matchMarketOrder(side, size) {
     // update mm balances based on trades
     // For mm: if mm sold TRUMP (taker buy), mm.TRUMP -= qty, mm.idr += qty*price
     // if mm bought TRUMP (taker sell), mm.TRUMP += qty, mm.idr -= qty*price
-    let totalBase = 0;
+    
     let totalIDR = 0;
     let unrealizedPnLTrade = 0;
     trades.forEach(t => {
@@ -132,6 +134,7 @@ function matchMarketOrder(side, size) {
             totalIDR += t.qty * t.price;
             totalUnrealizedPnL += (t.price - midPrice) * t.qty;
             unrealizedPnLTrade = (t.price - midPrice) * t.qty; // PnL for this trade
+
         } else { // mm bought TRUMP
             balances[BASE_COIN] += t.qty;
             balances.idr -= t.qty * t.price;
@@ -144,6 +147,8 @@ function matchMarketOrder(side, size) {
         txLog.unshift({ ts: Date.now(), price: t.price, qty: t.qty, side: t.side, unrealizedPnLTrade: unrealizedPnLTrade });
         if (txLog.length > 200) txLog.pop();
     });
+
+    avgPrice = (avgPrice * (totalBase - trades.reduce((sum, t) => sum + t.qty, 0)) + trades.reduce((sum, t) => sum + t.price * t.qty, 0)) / totalBase;
 
     return { trades, filled: size - remain, totalBase, totalIDR };
 }
@@ -198,7 +203,7 @@ app.post('/api/market', (req, res) => {
 
 // Websocket to clients (frontend)
 function broadcastState() {
-    const payload = JSON.stringify({ type: 'state', balances, orderbook, midPrice, txLog: txLog.slice(0, 50), totalUnrealizedPnL });
+    const payload = JSON.stringify({ type: 'state', balances, orderbook, midPrice, txLog: txLog.slice(0, 50), totalUnrealizedPnL, totalBase, avgPrice });
     wss.clients.forEach(client => {
         if (client.readyState === WebSocket.OPEN) client.send(payload);
     });
@@ -206,7 +211,7 @@ function broadcastState() {
 
 wss.on('connection', (ws) => {
     ws.send(JSON.stringify({ type: 'hello' }));
-    ws.send(JSON.stringify({ type: 'state', balances, orderbook, midPrice, txLog: txLog.slice(0, 50), totalUnrealizedPnL }));
+    ws.send(JSON.stringify({ type: 'state', balances, orderbook, midPrice, txLog: txLog.slice(0, 50), totalUnrealizedPnL, totalBase, avgPrice }));
 });
 
 // Connect to external feeds

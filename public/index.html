@@ -131,6 +131,8 @@
         <button id="btnSell">Simulate MARKET SELL (random qty)</button>
     </div>
 
+    <h3>Total Base Token</h3>
+    <div class="log" id="total_base"></div>
     <h3>Unrealized PnL</h3>
     <div class="log" id="pnl"></div>
     <h3>Transaction Log</h3>
@@ -171,10 +173,11 @@
         }
 
         function renderState(msg) {
-            const { balances, orderbook, midPrice, txLog, totalUnrealizedPnL } = msg;
+            const { balances, orderbook, midPrice, txLog, totalUnrealizedPnL, totalBase, avgPrice } = msg;
 
             document.getElementById('mid').innerText = 'Mid: ' + (midPrice ? Math.round(midPrice).toLocaleString() + ' ' + quoteCoin : '-');
             document.getElementById('pnl').innerText = `PnL: ${totalUnrealizedPnL ? totalUnrealizedPnL.toFixed(2) + ' ' + quoteCoin : '-'}`;
+            document.getElementById('total_base').innerText = `${totalBase ? totalBase + ' ' + baseCoin : '-'} | Avg Price: ${avgPrice ? avgPrice.toFixed(2) + ' ' + quoteCoin : '-'}`;
 
             const asksTbody = document.querySelector('#asks tbody');
             const bidsTbody = document.querySelector('#bids tbody');
