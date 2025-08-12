@@ -8,23 +8,23 @@ require('dotenv').config()
 
 // CONFIG
 const PORT = process.env.PORT || 3000;
-const START_BASE = 100000; // initial BASE
+const START_BASE = 1000000; // initial BASE
 const START_IDR = 10000000; // initial IDR
 const LEVELS = 10; // number of levels per side
 const SPREAD_PCT = 0.001; // 0.1% total spread (0.001 = 0.1%)
 const UPDATE_INTERVAL_MS = 1000; // update orderbook movement every 1s
-const LIQUIDITY_MIN = 200; // min QTY per level
-const LIQUIDITY_MAX = 4000; // max QTY per level
+const LIQUIDITY_MIN = 20000; // min QTY per level
+const LIQUIDITY_MAX = 400000; // max QTY per level
 const PRICE_SMOOTHING = 0.2; // 0..1, how strongly to follow external price (0 = no change, 1 = snap)
 
-const EXTERNAL_SYMBOL = process.env.EXTERNAL_SYMBOL || 'apeusdt'; // default 'trumpusdt'
+const EXTERNAL_SYMBOL = process.env.EXTERNAL_SYMBOL || 'animeusdt'; // default 'trumpusdt'
 
 // External websocket feeds
 const BINANCE_WSS = `wss://stream.binance.com:9443/ws/${EXTERNAL_SYMBOL}@trade`;
 
 const TOKO_WSS = 'wss://stream-toko.2meta.app/ws/usdtidr@trade'; // user-provided
 
-const BASE_COIN = process.env.BASE_COIN || 'APE';
+const BASE_COIN = process.env.BASE_COIN || 'ANIME';
 const QUOTE_COIN = 'idr'; // tetap idr
 
 // In-memory state

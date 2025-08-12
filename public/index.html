@@ -141,7 +141,7 @@
     <script>
         const ws = new WebSocket('ws://localhost:3000');
         let state = null;
-        let baseCoin = 'APE';   // default fallback
+        let baseCoin = 'ANIME';   // default fallback
         let quoteCoin = 'IDR';    // default fallback
 
         ws.addEventListener('open', () => console.log('connected to server ws'));
@@ -202,7 +202,7 @@
                 const barWidthPercent = (a.qty / maxAskQty) * 100;
 
                 tr.innerHTML = `
-                    <td>${Math.round(a.price).toLocaleString()} ${quoteCoin}</td>
+                    <td>${a.price.toFixed(2)} ${quoteCoin}</td>
                     <td class="qty-bar">${a.qty.toFixed(6)} ${baseCoin}
                         <div class="bar" style="width: ${barWidthPercent}%;"></div>
                     </td>
@@ -218,7 +218,7 @@
                 const barWidthPercent = (b.qty / maxBidQty) * 100;
 
                 tr.innerHTML = `
-                    <td>${Math.round(b.price).toLocaleString()} ${quoteCoin}</td>
+                    <td>${b.price.toFixed(2)} ${quoteCoin}</td>
                     <td class="qty-bar">${b.qty.toFixed(6)} ${baseCoin}
                         <div class="bar" style="width: ${barWidthPercent}%;"></div>
                     </td>
