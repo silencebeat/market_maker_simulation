@@ -131,9 +131,9 @@
         <button id="btnSell">Simulate MARKET SELL (random qty)</button>
     </div>
 
-    <h3>Total Base Token</h3>
+    <h3>Total Base Token owned by Market Maker</h3>
     <div class="log" id="total_base"></div>
-    <h3>Unrealized PnL</h3>
+    <h3>Unrealized PnL (Transaction bases)</h3>
     <div class="log" id="pnl"></div>
     <h3>Transaction Log</h3>
     <div class="log" id="log"></div>
@@ -141,7 +141,7 @@
     <script>
         const ws = new WebSocket('ws://localhost:3000');
         let state = null;
-        let baseCoin = 'BABY';   // default fallback
+        let baseCoin = 'APE';   // default fallback
         let quoteCoin = 'IDR';    // default fallback
 
         ws.addEventListener('open', () => console.log('connected to server ws'));
@@ -175,9 +175,16 @@
         function renderState(msg) {
             const { balances, orderbook, midPrice, txLog, totalUnrealizedPnL, totalBase, avgPrice } = msg;
 
+            let PnL = 0
+            if(totalBase < 0){
+                PnL =  (totalBase * avgPrice) - (totalBase * midPrice);
+            }else{
+                PnL =  (totalBase * midPrice) - (totalBase * avgPrice);
+            }
+
             document.getElementById('mid').innerText = 'Mid: ' + (midPrice ? Math.round(midPrice).toLocaleString() + ' ' + quoteCoin : '-');
             document.getElementById('pnl').innerText = `PnL: ${totalUnrealizedPnL ? totalUnrealizedPnL.toFixed(2) + ' ' + quoteCoin : '-'}`;
-            document.getElementById('total_base').innerText = `${totalBase ? totalBase + ' ' + baseCoin : '-'} | Avg Price: ${avgPrice ? avgPrice.toFixed(2) + ' ' + quoteCoin : '-'}`;
+            document.getElementById('total_base').innerText = `${totalBase ? totalBase + ' ' + baseCoin : '-'} | Avg Price: ${avgPrice ? avgPrice.toFixed(2) + ' ' + quoteCoin : '-'} | PnL: ${PnL.toFixed(2)} ${quoteCoin}`;
 
             const asksTbody = document.querySelector('#asks tbody');
             const bidsTbody = document.querySelector('#bids tbody');

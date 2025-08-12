@@ -8,23 +8,23 @@ require('dotenv').config()
 
 // CONFIG
 const PORT = process.env.PORT || 3000;
-const START_BASE = 1000000; // initial BASE
+const START_BASE = 100000; // initial BASE
 const START_IDR = 10000000; // initial IDR
 const LEVELS = 10; // number of levels per side
 const SPREAD_PCT = 0.001; // 0.1% total spread (0.001 = 0.1%)
-const UPDATE_INTERVAL_MS = 2000; // update orderbook movement every 1s
-const LIQUIDITY_MIN = 2000; // min QTY per level
-const LIQUIDITY_MAX = 40000; // max QTY per level
+const UPDATE_INTERVAL_MS = 1000; // update orderbook movement every 1s
+const LIQUIDITY_MIN = 200; // min QTY per level
+const LIQUIDITY_MAX = 4000; // max QTY per level
 const PRICE_SMOOTHING = 0.2; // 0..1, how strongly to follow external price (0 = no change, 1 = snap)
 
-const EXTERNAL_SYMBOL = process.env.EXTERNAL_SYMBOL || 'babyusdt'; // default 'trumpusdt'
+const EXTERNAL_SYMBOL = process.env.EXTERNAL_SYMBOL || 'apeusdt'; // default 'trumpusdt'
 
 // External websocket feeds
 const BINANCE_WSS = `wss://stream.binance.com:9443/ws/${EXTERNAL_SYMBOL}@trade`;
 
 const TOKO_WSS = 'wss://stream-toko.2meta.app/ws/usdtidr@trade'; // user-provided
 
-const BASE_COIN = process.env.BASE_COIN || 'BABY';
+const BASE_COIN = process.env.BASE_COIN || 'APE';
 const QUOTE_COIN = 'idr'; // tetap idr
 
 // In-memory state
@@ -126,6 +126,7 @@ function matchMarketOrder(side, size) {
     
     let totalIDR = 0;
     let unrealizedPnLTrade = 0;
+    let totalPrice = 0;
     trades.forEach(t => {
         if (t.side === 'buy') { // mm sold TRUMP
             balances[BASE_COIN] -= t.qty;
@@ -144,11 +145,14 @@ function matchMarketOrder(side, size) {
             unrealizedPnLTrade = (midPrice - t.price) * t.qty; // PnL for this trade
         }
 
+        totalPrice += t.price; // accumulate price for avg calculation
+
         txLog.unshift({ ts: Date.now(), price: t.price, qty: t.qty, side: t.side, unrealizedPnLTrade: unrealizedPnLTrade });
         if (txLog.length > 200) txLog.pop();
     });
 
-    avgPrice = (avgPrice * (totalBase - trades.reduce((sum, t) => sum + t.qty, 0)) + trades.reduce((sum, t) => sum + t.price * t.qty, 0)) / totalBase;
+    avgPrice = totalBase !== 0 ? (totalPrice / trades.length) : 0; // average price of trades
+    // avgPrice = (avgPrice * (totalBase - trades.reduce((sum, t) => sum + t.qty, 0)) + trades.reduce((sum, t) => sum + t.price * t.qty, 0)) / totalBase;
 
     return { trades, filled: size - remain, totalBase, totalIDR };
 }
