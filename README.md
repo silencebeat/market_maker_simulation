@@ -1,6 +1,8 @@
-# Tokocrypto Orderbook Simulator (Pairing token/IDR)
+![Market Maker Demo](assets/market-maker.gif)
 
-Simulator ini menampilkan orderbook dan menghitung Unrealized PnL secara real-time untuk pasangan **token/IDR**.  
+# Tokocrypto Market Maker Simulator (Pairing token/IDR)
+
+Simulator ini menampilkan market maker di orderbook dan menghitung Unrealized PnL secara real-time untuk pasangan **token/IDR**.  
 Contoh: `BTC/IDR`, `TRUMP/IDR`, `AI/IDR`.
 
 Backend mengirim data orderbook via WebSocket (`ws://localhost:3000`), dan front-end menampilkannya lengkap dengan depth chart langsung di tabel.
