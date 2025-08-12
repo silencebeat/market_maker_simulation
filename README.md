@@ -1,6 +1,6 @@
 ![Market Maker Demo](assets/market-maker.gif)
 
-# Tokocrypto Market Maker Simulator (Pairing token/IDR)
+# Market Maker Simulator (Pairing token/IDR)
 
 Simulator ini menampilkan market maker di orderbook dan menghitung Unrealized PnL secara real-time untuk pasangan **token/IDR**.  
 Contoh: `BTC/IDR`, `TRUMP/IDR`, `AI/IDR`.
