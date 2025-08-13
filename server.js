@@ -8,23 +8,24 @@ require('dotenv').config()
 
 // CONFIG
 const PORT = process.env.PORT || 3000;
-const START_BASE = 1000000; // initial BASE
+const START_BASE = 100000; // initial BASE
 const START_IDR = 10000000; // initial IDR
-const LEVELS = 10; // number of levels per side
+const LEVELS = 15; // number of levels per side
 const SPREAD_PCT = 0.001; // 0.1% total spread (0.001 = 0.1%)
 const UPDATE_INTERVAL_MS = 1000; // update orderbook movement every 1s
-const LIQUIDITY_MIN = 20000; // min QTY per level
-const LIQUIDITY_MAX = 400000; // max QTY per level
+const LIQUIDITY_MIN = 6000; // min QTY per level
+const LIQUIDITY_MAX = 15000; // max QTY per level
 const PRICE_SMOOTHING = 0.2; // 0..1, how strongly to follow external price (0 = no change, 1 = snap)
 
 const EXTERNAL_SYMBOL = process.env.EXTERNAL_SYMBOL || 'animeusdt'; // default 'trumpusdt'
+const BASE_COIN = process.env.BASE_COIN || 'ANIME';
+console.log('Using base coin:', BASE_COIN); 
 
 // External websocket feeds
-const BINANCE_WSS = `wss://stream.binance.com:9443/ws/${EXTERNAL_SYMBOL}@trade`;
+const BINANCE_WSS = `wss://stream.binance.com:9443/ws/${BASE_COIN.toLowerCase()}usdt@trade`;
 
 const TOKO_WSS = 'wss://stream-toko.2meta.app/ws/usdtidr@trade'; // user-provided
 
-const BASE_COIN = process.env.BASE_COIN || 'ANIME';
 const QUOTE_COIN = 'idr'; // tetap idr
 
 // In-memory state
@@ -154,7 +155,35 @@ function matchMarketOrder(side, size) {
     avgPrice = totalBase !== 0 ? (totalPrice / trades.length) : 0; // average price of trades
     // avgPrice = (avgPrice * (totalBase - trades.reduce((sum, t) => sum + t.qty, 0)) + trades.reduce((sum, t) => sum + t.price * t.qty, 0)) / totalBase;
 
+    // Refill orderbook untuk jaga liquidity
+    refillOrderbookLevels();
     return { trades, filled: size - remain, totalBase, totalIDR };
+}
+
+function refillOrderbookLevels() {
+    const depthFactor = 1.0008;
+    const spread = SPREAD_PCT;
+    const topBid = midPrice * (1 - spread / 2);
+    const topAsk = midPrice * (1 + spread / 2);
+
+    // Refilling bids
+    while (orderbook.bids.length < LEVELS) {
+        const i = orderbook.bids.length; // index untuk level baru
+        const priceBid = topBid / Math.pow(depthFactor, i);
+        const qtyBid = parseFloat(randBetween(LIQUIDITY_MIN, LIQUIDITY_MAX).toFixed(6));
+        orderbook.bids.push({ id: 'mm-' + (clientIdCounter++), price: priceBid, qty: qtyBid, owner: 'mm' });
+    }
+
+    // Refilling asks
+    while (orderbook.asks.length < LEVELS) {
+        const i = orderbook.asks.length;
+        const priceAsk = topAsk * Math.pow(depthFactor, i);
+        const qtyAsk = parseFloat(randBetween(LIQUIDITY_MIN, LIQUIDITY_MAX).toFixed(6));
+        orderbook.asks.push({ id: 'mm-' + (clientIdCounter++), price: priceAsk, qty: qtyAsk, owner: 'mm' });
+    }
+
+    orderbook.bids.sort((a, b) => b.price - a.price);
+    orderbook.asks.sort((a, b) => a.price - b.price);
 }
 
 // Periodic orderbook drift towards external midPrice changes
@@ -200,6 +229,22 @@ app.post('/api/market', (req, res) => {
     }
     const result = matchMarketOrder(side, qty);
     broadcastState();
+    res.json(result);
+});
+
+app.get('/api/config', (req, res) => {
+    const result = {
+        baseCoin: BASE_COIN,
+        quoteCoin: QUOTE_COIN,
+        externalSymbol: EXTERNAL_SYMBOL,
+        startBase: START_BASE,
+        startIdr: START_IDR,
+        levels: LEVELS,
+        spreadPct: SPREAD_PCT,
+        liquidityMin: LIQUIDITY_MIN,
+        liquidityMax: LIQUIDITY_MAX,
+        priceSmoothing: PRICE_SMOOTHING
+    };
     res.json(result);
 });
 

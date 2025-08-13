@@ -29,8 +29,10 @@
         td {
             padding: 6px;
             text-align: right;
-            position: relative; /* buat bar overlay */
-            overflow: hidden; /* agar bar tidak melebar */
+            position: relative;
+            /* buat bar overlay */
+            overflow: hidden;
+            /* agar bar tidak melebar */
         }
 
         th {
@@ -61,11 +63,13 @@
         }
 
         tr.ask td.qty-bar .bar {
-            background-color: #b00020; /* merah */
+            background-color: #b00020;
+            /* merah */
         }
 
         tr.bid td.qty-bar .bar {
-            background-color: #007b00; /* hijau */
+            background-color: #007b00;
+            /* hijau */
         }
 
         .info {
@@ -144,8 +148,23 @@
         let baseCoin = 'ANIME';   // default fallback
         let quoteCoin = 'IDR';    // default fallback
 
-        ws.addEventListener('open', () => console.log('connected to server ws'));
-        ws.addEventListener('message', (ev) => {
+        let config = {};
+
+        // Ambil config dari server
+        fetch('http://localhost:3000/api/config')
+            .then(res => res.json())
+            .then(cfg => {
+                config = cfg;
+                baseCoin = cfg.baseCoin?.toUpperCase() || baseCoin;
+                quoteCoin = cfg.quoteCoin?.toUpperCase() || quoteCoin;
+
+                // Setelah dapat config, baru connect WebSocket
+                const ws = new WebSocket('ws://localhost:3000');
+                ws.addEventListener('open', () => console.log('connected to server ws'));
+                ws.addEventListener('message', handleMessage);
+            })
+            .catch(err => console.error("Gagal load config:", err));
+        function handleMessage(ev) {
             try {
                 const msg = JSON.parse(ev.data);
                 if (msg.type === 'state') {
@@ -159,7 +178,23 @@
             } catch (e) {
                 console.error(e);
             }
-        });
+        }
+        // ws.addEventListener('open', () => console.log('connected to server ws'));
+        // ws.addEventListener('message', (ev) => {
+        //     try {
+        //         const msg = JSON.parse(ev.data);
+        //         if (msg.type === 'state') {
+        //             state = msg;
+        //             if (msg.baseCoin) baseCoin = msg.baseCoin.toUpperCase();
+        //             if (msg.quoteCoin) quoteCoin = msg.quoteCoin.toUpperCase();
+
+        //             updateLabels();
+        //             renderState(msg);
+        //         }
+        //     } catch (e) {
+        //         console.error(e);
+        //     }
+        // });
 
         function updateLabels() {
             document.getElementById('title').innerText = `Tokocrypto Orderbook Simulator — ${baseCoin}/${quoteCoin}`;
@@ -176,15 +211,15 @@
             const { balances, orderbook, midPrice, txLog, totalUnrealizedPnL, totalBase, avgPrice } = msg;
 
             let PnL = 0
-            if(totalBase < 0){
-                PnL =  (totalBase * avgPrice) - (totalBase * midPrice);
-            }else{
-                PnL =  (totalBase * midPrice) - (totalBase * avgPrice);
+            if (totalBase < 0) {
+                PnL = (totalBase * avgPrice) - (totalBase * midPrice);
+            } else {
+                PnL = (totalBase * midPrice) - (totalBase * avgPrice);
             }
 
             document.getElementById('mid').innerText = 'Mid: ' + (midPrice ? Math.round(midPrice).toLocaleString() + ' ' + quoteCoin : '-');
             document.getElementById('pnl').innerText = `PnL: ${totalUnrealizedPnL ? totalUnrealizedPnL.toFixed(2) + ' ' + quoteCoin : '-'}`;
-            document.getElementById('total_base').innerText = `${totalBase ? totalBase + ' ' + baseCoin : '-'} | Avg Price: ${avgPrice ? avgPrice.toFixed(2) + ' ' + quoteCoin : '-'} | PnL: ${PnL.toFixed(2)} ${quoteCoin}`;
+            document.getElementById('total_base').innerText = `${totalBase ? totalBase + ' ' + baseCoin : '-'} | Avg Price: ${avgPrice ? avgPrice.toFixed(2) + ' ' + quoteCoin : '-'} | Unrealized PnL: ${PnL.toFixed(2)} ${quoteCoin}`;
 
             const asksTbody = document.querySelector('#asks tbody');
             const bidsTbody = document.querySelector('#bids tbody');
